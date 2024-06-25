@@ -85,7 +85,7 @@ class ImageLoader(QtWidgets.QWidget):
 
         self.label.setAlignment(QtCore.Qt.AlignCenter)
 
-        self.loadImageButton = QtWidgets.QPushButton('Load image')
+        self.loadImageButton = QtWidgets.QPushButton('Load Image')
         layout.addWidget(self.loadImageButton, 0, 0, 1, 1)
 
         self.clearButton = QtWidgets.QPushButton('Clear Canvas')
@@ -105,16 +105,13 @@ class ImageLoader(QtWidgets.QWidget):
         self.loadImageButton.clicked.connect(self.loadImage)
         # self.nextImageButton.clicked.connect(self.nextImage)
         self.clearButton.clicked.connect(self.clearScene)
-        self.undoButton.clicked.connect(self.clearScene)
+        self.undoButton.clicked.connect(self.undo)
         self.saveAllROIButton.clicked.connect(self.saveROI)
         
 
         self.filename = ''
-        self.cropState = 0 # 0 = inactive, 1 = left, 2 = right
-        self.x = 0
         self.dirIterator = None
         self.fileList = []
-        self.fullFileList = []
         self.pixmap = QtGui.QPixmap()
 
     def loadImage(self):
@@ -140,7 +137,6 @@ class ImageLoader(QtWidgets.QWidget):
 
 
             self.fileList.sort()
-            self.fullFileList.sort()
             self.dirIterator = iter(self.fileList)
           
             while True:
@@ -148,32 +144,6 @@ class ImageLoader(QtWidgets.QWidget):
                 if next(self.dirIterator) == self.filename:
                     break
 
-        
-
-    # def nextImage(self):
-    #     self.clearScene()
-    #     # ensure that the file list has not been cleared due to missing files
-    #     # del self.painter
-    #     if self.fileList:
-    #         try:
-    #             self.filename = next(self.dirIterator)
-    #             self.setWindowTitle(self.filename)
-    #             self.pixmap = QtGui.QPixmap(self.filename).scaled(self.label.size(), 
-    #                 QtCore.Qt.KeepAspectRatio)
-    #             if self.pixmap.isNull():
-    #                 # the file is not a valid image, remove it from the list
-    #                 # and try to load the next one
-    #                 self.fileList.remove(self.filename)
-    #                 self.nextImage()
-    #             else:
-    #                 self.label.setPixmap(self.pixmap)
-    #         except:
-    #             # the iterator has finished, restart it
-    #             self.dirIterator = iter(self.fileList)
-    #             self.nextImage()
-    #     else:
-    #         # no file list found, load an image
-    #         self.loadImage()
 
     def clearScene(self):
         # print(self.label.ROIList)
@@ -182,6 +152,19 @@ class ImageLoader(QtWidgets.QWidget):
         self.label.graphicsPixmapItem = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap(self.pixmap))
         self.label.scene.addItem(self.label.graphicsPixmapItem)
         # print(self.label.ROIList)
+
+    def undo(self):
+        # print(self.label.ROIList)
+        self.label.scene.clear()
+        self.label.graphicsPixmapItem = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap(self.pixmap))
+        self.label.scene.addItem(self.label.graphicsPixmapItem)
+        # print(self.label.ROIList)
+        self.label.ROIList.pop()
+        # print(self.label.ROIList)
+        for roi in self.label.ROIList:
+            # print(roi.x, roi.y)
+            self.label.scene.addRect(roi.x, roi.y, roi.w, roi.h, pen = QtGui.QPen(QtCore.Qt.red, 4))
+
 
     def save_region_and_update_json(self, x_left, y_up, width, height, json_path):
     # Check if JSON file exists
@@ -223,20 +206,21 @@ class ImageLoader(QtWidgets.QWidget):
             os.mkdir(roiDir)
             # print(roiDir)
             srcDir = os.path.dirname(self.filename)
-            print(srcDir)
+            # print(srcDir)
             for f in os.listdir(srcDir):
-                imgName= os.path.join(srcDir, f)
-                im = Image.open(imgName)
-                width, _ = im.size
-                ratio = width / self.pixmap.width()
-                # print(ratio)
-                # print(roi.x, roi.y, roi.w, roi.h)
-                # print((int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h * ratio)))
-                im1 = im.crop((int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)))
-                im1.save(os.path.join(roiDir, f), format = 'JPEG', dpi = im1.info['dpi'])
+                if f.endswith(('.png', '.jpg', '.jpeg')):
+                    imgName= os.path.join(srcDir, f)
+                    im = Image.open(imgName)
+                    width, _ = im.size
+                    ratio = width / self.pixmap.width()
+                    # print(ratio)
+                    # print(roi.x, roi.y, roi.w, roi.h)
+                    # print((int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h * ratio)))
+                    im1 = im.crop((int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)))
+                    im1.save(os.path.join(roiDir, f), format = 'JPEG', dpi = im1.info['dpi'])
 
             jsonPath = os.path.join(dir, JSON_FILENAME)
-            print(jsonPath)
+            # print(jsonPath)
             self.save_region_and_update_json(int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h  * ratio), jsonPath)
 
         
