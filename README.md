@@ -6,7 +6,7 @@
   - This assumes that the folder containing the file includes all other channels e.g. :
 ``` 
 OC_Images
-│   OC_images/G1 Ano_3ng RANKL_stack_adj_A.jpg <-- open this file
+│   G1 Ano_3ng RANKL_stack_adj_A.jpg <-- open this file
 │   G1 Ano_3ng RANKL_stack_adj_B.jpg
 |   G1 Ano_3ng RANKL_stack_adj_G.jpg
 |   G1 Ano_3ng RANKL_stack_adj_Y.jpg  
