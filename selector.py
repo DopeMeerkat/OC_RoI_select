@@ -2,7 +2,7 @@ import sys
 import os
 import json
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from psd_tools import PSDImage
 from PIL import Image
 
 
@@ -66,6 +66,7 @@ class GraphicView(QtWidgets.QGraphicsView):
         self.selectedRegion['h'] = self.rubberBand.geometry().height()
         self.scene.addRect(self.selectedRegion['x'],self.selectedRegion['y'],self.selectedRegion['w'],self.selectedRegion['h'], pen = QtGui.QPen(QtCore.Qt.red, 4))
         self.ROIList.append(ROI(self.selectedRegion['x'],self.selectedRegion['y'],self.selectedRegion['w'],self.selectedRegion['h']))
+        self.rubberBand.hide()
         # print('mouse released', self.selectedRegion)
 
 class ImageLoader(QtWidgets.QWidget):
@@ -75,6 +76,8 @@ class ImageLoader(QtWidgets.QWidget):
 
         # self.label = QtWidgets.QLabel()
         self.label = GraphicView()
+        self.label.setAlignment(QtCore.Qt.AlignTop)
+        self.label.setAlignment(QtCore.Qt.AlignLeft)
         layout.addWidget(self.label, 1, 0, 1, 4)
         self.label.setMinimumSize(IMAGE_WIDTH, IMAGE_HEIGHT)
         self.label.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -110,14 +113,36 @@ class ImageLoader(QtWidgets.QWidget):
         
 
         self.filename = ''
+        self.baseName = ''
+        self.dirname = ''
         self.dirIterator = None
         self.fileList = []
         self.pixmap = QtGui.QPixmap()
 
     def loadImage(self):
         self.clearScene()
+        # self.filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+        #     self, 'Select Image', '', 'Image Files (*.png *.jpg *.jpeg *.psd)')
         self.filename, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, 'Select Image', '', 'Image Files (*.png *.jpg *.jpeg)')
+            self, 'Select Image', '', 'Image Files (*_ska.psd)')
+        
+        if self.filename.endswith('_ska.psd'): # selected psd
+            self.baseName = os.path.basename(self.filename)[:-8]
+            self.dirname = os.path.dirname(self.filename) 
+            layersDir = os.path.join(self.dirname, self.baseName + '_Layers')
+            if not os.path.exists(layersDir):
+                os.mkdir(layersDir)
+            psd = PSDImage.open(self.filename)
+            newFilename =  self.baseName + '_A.jpg'
+            psd.composite().convert('RGB').save(os.path.join(layersDir, newFilename), format = 'JPEG', dpi = (300,300))
+            for layer in psd:
+                # print(layer)
+                layer_image = layer.composite()
+                layer_image = layer_image.convert('RGB')
+                layer_image.save(os.path.join(layersDir, self.baseName + '_%s.jpg' % layer.name), format = 'JPEG', dpi = (300,300))
+
+            self.filename = os.path.join(layersDir, newFilename)
+            
         if self.filename:
             self.setWindowTitle(self.filename)
             self.pixmap = QtGui.QPixmap(self.filename).scaled(self.label.size(), QtCore.Qt.KeepAspectRatio)
@@ -158,12 +183,12 @@ class ImageLoader(QtWidgets.QWidget):
         self.label.scene.clear()
         self.label.graphicsPixmapItem = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap(self.pixmap))
         self.label.scene.addItem(self.label.graphicsPixmapItem)
-        # print(self.label.ROIList)
-        self.label.ROIList.pop()
-        # print(self.label.ROIList)
-        for roi in self.label.ROIList:
-            # print(roi.x, roi.y)
-            self.label.scene.addRect(roi.x, roi.y, roi.w, roi.h, pen = QtGui.QPen(QtCore.Qt.red, 4))
+        if self.label.ROIList: #if not empty
+            self.label.ROIList.pop()
+            # print(self.label.ROIList)
+            for roi in self.label.ROIList:
+                # print(roi.x, roi.y)
+                self.label.scene.addRect(roi.x, roi.y, roi.w, roi.h, pen = QtGui.QPen(QtCore.Qt.red, 4))
 
 
     def save_region_and_update_json(self, x_left, y_up, width, height, json_path):
@@ -200,7 +225,16 @@ class ImageLoader(QtWidgets.QWidget):
             json.dump(data, f, indent=4)
 
     def saveROI(self):
-        dir = QtWidgets.QFileDialog.getExistingDirectory(self, 'Open Directory', '.', QtWidgets.QFileDialog.ShowDirsOnly)
+        # dir = QtWidgets.QFileDialog.getExistingDirectory(self, 'Open Directory', '.', QtWidgets.QFileDialog.ShowDirsOnly)
+        
+        dir = self.dirname
+        pic = self.pixmap
+        painter = QtGui.QPainter(pic)
+        self.label.scene.render(painter)
+
+        painter.setPen(QtCore.Qt.darkRed)
+        pic.save(os.path.join(dir, os.path.join(self.baseName + '_Layers', self.baseName + '__Reference')), "JPG")
+
         for i, roi in enumerate(self.label.ROIList):
             roiDir = os.path.join(dir, 'RoI' + str(i + 1))
             os.mkdir(roiDir)
@@ -219,7 +253,7 @@ class ImageLoader(QtWidgets.QWidget):
                     im1 = im.crop((int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)))
                     im1.save(os.path.join(roiDir, f), format = 'JPEG', dpi = im1.info['dpi'])
 
-            jsonPath = os.path.join(dir, JSON_FILENAME)
+            jsonPath = os.path.join(dir, os.path.join(self.baseName + '_Layers', JSON_FILENAME))
             # print(jsonPath)
             self.save_region_and_update_json(int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h  * ratio), jsonPath)
 
