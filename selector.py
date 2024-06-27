@@ -113,6 +113,7 @@ class ImageLoader(QtWidgets.QWidget):
         
 
         self.filename = ''
+        self.psdName = ''
         self.baseName = ''
         self.dirname = ''
         self.dirIterator = None
@@ -125,23 +126,22 @@ class ImageLoader(QtWidgets.QWidget):
         #     self, 'Select Image', '', 'Image Files (*.png *.jpg *.jpeg *.psd)')
         self.filename, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, 'Select Image', '', 'Image Files (*_ska.psd)')
-        
-        if self.filename.endswith('_ska.psd'): # selected psd
-            self.baseName = os.path.basename(self.filename)[:-8]
-            self.dirname = os.path.dirname(self.filename) 
-            layersDir = os.path.join(self.dirname, self.baseName + '_Layers')
-            if not os.path.exists(layersDir):
-                os.mkdir(layersDir)
-            psd = PSDImage.open(self.filename)
-            newFilename =  self.baseName + '_A.jpg'
-            psd.composite().convert('RGB').save(os.path.join(layersDir, newFilename), format = 'JPEG', dpi = (300,300))
-            for layer in psd:
-                # print(layer)
-                layer_image = layer.composite()
-                layer_image = layer_image.convert('RGB')
-                layer_image.save(os.path.join(layersDir, self.baseName + '_%s.jpg' % layer.name), format = 'JPEG', dpi = (300,300))
+        self.psdName = self.filename
+        self.baseName = os.path.basename(self.filename)[:-8]
+        self.dirname = os.path.dirname(self.filename) 
+        layersDir = os.path.join(self.dirname, self.baseName + '_Layers')
+        if not os.path.exists(layersDir):
+            os.mkdir(layersDir)
+        psd = PSDImage.open(self.filename)
+        newFilename =  self.baseName + '_A.jpg'
+        psd.composite().convert('RGB').save(os.path.join(layersDir, newFilename), format = 'JPEG', dpi = (300,300))
+        for layer in psd:
+            # print(layer)
+            layer_image = layer.composite()
+            layer_image = layer_image.convert('RGB')
+            layer_image.save(os.path.join(layersDir, self.baseName + '_%s.jpg' % layer.name), format = 'JPEG', dpi = (300,300))
 
-            self.filename = os.path.join(layersDir, newFilename)
+        self.filename = os.path.join(layersDir, newFilename)
             
         if self.filename:
             self.setWindowTitle(self.filename)
@@ -241,6 +241,10 @@ class ImageLoader(QtWidgets.QWidget):
             # print(roiDir)
             srcDir = os.path.dirname(self.filename)
             # print(srcDir)
+            psdImg = Image.open(self.psdName)
+            psdWidth, _ = psdImg.size
+            psdRatio = psdWidth / self.pixmap.width()
+            
             for f in os.listdir(srcDir):
                 if f.endswith(('.png', '.jpg', '.jpeg')):
                     imgName= os.path.join(srcDir, f)
@@ -252,6 +256,8 @@ class ImageLoader(QtWidgets.QWidget):
                     # print((int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h * ratio)))
                     im1 = im.crop((int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)))
                     im1.save(os.path.join(roiDir, f), format = 'JPEG', dpi = im1.info['dpi'])
+                    im2 = psdImg.crop((int(roi.x * psdRatio), int(roi.y * psdRatio), int((roi.w + roi.x) * psdRatio), int((roi.h + roi.y) * psdRatio)))
+                    im2.save(os.path.join(roiDir, self.baseName + '_psd.psd'), format = 'PSD')
 
             jsonPath = os.path.join(dir, os.path.join(self.baseName + '_Layers', JSON_FILENAME))
             # print(jsonPath)
