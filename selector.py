@@ -233,17 +233,17 @@ class ImageLoader(QtWidgets.QWidget):
         self.label.scene.render(painter)
 
         painter.setPen(QtCore.Qt.darkRed)
-        pic.save(os.path.join(dir, os.path.join(self.baseName + '_Layers', self.baseName + '__Reference')), "JPG")
+        pic.save(os.path.join(dir, os.path.join(self.baseName + '_Layers', self.baseName + '__Reference.jpg')), "JPG")
 
         for i, roi in enumerate(self.label.ROIList):
-            roiDir = os.path.join(dir, 'RoI' + str(i + 1))
+            roiDir = os.path.join(dir, self.basename + '_RoI' + str(i + 1))
             os.mkdir(roiDir)
             # print(roiDir)
             srcDir = os.path.dirname(self.filename)
             # print(srcDir)
-            psdImg = Image.open(self.psdName)
-            psdWidth, _ = psdImg.size
-            psdRatio = psdWidth / self.pixmap.width()
+            # psdImg = Image.open(self.psdName)
+            # psdWidth, _ = psdImg.size
+            # psdRatio = psdWidth / self.pixmap.width()
             
             for f in os.listdir(srcDir):
                 if f.endswith(('.png', '.jpg', '.jpeg')):
@@ -256,8 +256,8 @@ class ImageLoader(QtWidgets.QWidget):
                     # print((int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h * ratio)))
                     im1 = im.crop((int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)))
                     im1.save(os.path.join(roiDir, f), format = 'JPEG', dpi = im1.info['dpi'])
-                    im2 = psdImg.crop((int(roi.x * psdRatio), int(roi.y * psdRatio), int((roi.w + roi.x) * psdRatio), int((roi.h + roi.y) * psdRatio)))
-                    im2.save(os.path.join(roiDir, self.baseName + '_psd.psd'), format = 'PSD')
+                    # im2 = psdImg.crop((int(roi.x * psdRatio), int(roi.y * psdRatio), int((roi.w + roi.x) * psdRatio), int((roi.h + roi.y) * psdRatio)))
+                    # im2.save(os.path.join(roiDir, self.baseName + '_psd.psd'), format = 'PSD')
 
             jsonPath = os.path.join(dir, os.path.join(self.baseName + '_Layers', JSON_FILENAME))
             # print(jsonPath)
