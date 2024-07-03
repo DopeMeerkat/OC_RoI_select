@@ -1,6 +1,8 @@
 import os
 from PIL import Image, ImageDraw
 import pybboxes as pbx
+import tkinter as tk
+from tkinter import filedialog
 
 REFERENCE_SCALE = 5
 
@@ -41,7 +43,7 @@ def cropCells(layerDir):
             # print(label)
             label = label.split(' ')
             label[4] = label[4][:-2] #remove \n
-            cellDir = os.path.join(dir, f'Cell-{(i + 1)}_class-{classes[int(label[0])]}')
+            cellDir = os.path.join(dir, f'Cell{(i + 1)}_{classes[int(label[0])]}')
             if not os.path.exists(cellDir):
                 os.mkdir(cellDir)
             for file in os.listdir(layerDir):
@@ -56,18 +58,15 @@ def cropCells(layerDir):
                     im1 = im.crop((converted[0],converted[1],converted[2],converted[3]))
                     im1.save(os.path.join(cellDir, file), format = 'JPEG', dpi = im.info['dpi'])
 
+root = tk.Tk()
+root.withdraw()
 
-
-
-
-
-
-
-cwd = os.getcwd()
-for subdir, dirs, files in os.walk(cwd):
-    # for file in files:
-    #     print(file)
-    for dir in dirs:
-        if dir.find('RoI') != -1:
-            cropCells(dir)
-
+dir = filedialog.askdirectory(initialdir=os.getcwd(), title='Select RoI Folder (AR1_RoI1)')
+cropCells(dir)
+# cwd = os.getcwd()
+# for subdir, dirs, files in os.walk(cwd):
+#     # for file in files:
+#     #     print(file)
+#     for dir in dirs:
+#         if dir.find('RoI') != -1:
+#             cropCells(dir)
