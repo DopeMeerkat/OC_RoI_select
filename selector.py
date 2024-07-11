@@ -3,7 +3,7 @@ import os
 import json
 from PyQt5 import QtCore, QtGui, QtWidgets
 from psd_tools import PSDImage
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 
 
@@ -11,6 +11,7 @@ Image.MAX_IMAGE_PIXELS = 200000000
 IMAGE_HEIGHT = 1024 
 IMAGE_WIDTH = 1024  
 JSON_FILENAME = 'RoI_coordinates.json'
+REFERENCE_SCALE = 1
 
 class ROI():
     def __init__(self, x, y, w, h):
@@ -119,6 +120,32 @@ class ImageLoader(QtWidgets.QWidget):
         self.dirIterator = None
         self.fileList = []
         self.pixmap = QtGui.QPixmap()
+    
+    def loadJSON(self, json_path):
+        if os.path.exists(json_path):
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+            # print(data)
+            self.label.ROIList = []
+            imagePath = os.path.join(os.path.dirname(json_path), self.baseName + '_A.jpg')
+            # print(imagePath)
+            im = Image.open(imagePath)
+
+            width, _ = im.size
+            ratio = self.pixmap.width() / width
+            for roi in data['annotations']:
+                # print(roi)
+                self.label.ROIList.append(ROI(int(roi['x_left'] * ratio), 
+                                              int(roi['y_up'] * ratio), 
+                                              int((roi['x_right'] - roi['x_left']) * ratio), 
+                                              int((roi['y_low'] - roi['y_up'])* ratio)))
+            # print(self.label.ROIList)
+
+            # 
+            if self.label.ROIList: #if not empty
+                for roi in self.label.ROIList:
+                    self.label.scene.addRect(roi.x, roi.y, roi.w, roi.h, pen = QtGui.QPen(QtCore.Qt.red, 4))
+
 
     def loadImage(self):
         self.clearScene()
@@ -130,19 +157,20 @@ class ImageLoader(QtWidgets.QWidget):
         self.baseName = os.path.basename(self.filename)[:-8]
         self.dirname = os.path.dirname(self.filename) 
         layersDir = os.path.join(self.dirname, self.baseName + '_Layers')
+
+        newFilename =  self.baseName + '_A.jpg'
+        
         if not os.path.exists(layersDir):
             os.mkdir(layersDir)
-        psd = PSDImage.open(self.filename)
-        newFilename =  self.baseName + '_A.jpg'
-        psd.composite().convert('RGB').save(os.path.join(layersDir, newFilename), format = 'JPEG', dpi = (300,300))
-        for layer in psd:
-            # print(layer)
-            layer_image = layer.composite()
-            layer_image = layer_image.convert('RGB')
-            layer_image.save(os.path.join(layersDir, self.baseName + '_%s.jpg' % layer.name), format = 'JPEG', dpi = (300,300))
+            psd = PSDImage.open(self.filename)
+            psd.composite().convert('RGB').save(os.path.join(layersDir, newFilename), format = 'JPEG', dpi = (300,300))
+            for layer in psd:
+                # print(layer)
+                layer_image = layer.composite()
+                layer_image = layer_image.convert('RGB')
+                layer_image.save(os.path.join(layersDir, self.baseName + '_%s.jpg' % layer.name), format = 'JPEG', dpi = (300,300))
 
         self.filename = os.path.join(layersDir, newFilename)
-            
         if self.filename:
             self.setWindowTitle(self.filename)
             self.pixmap = QtGui.QPixmap(self.filename).scaled(self.label.size(), QtCore.Qt.KeepAspectRatio)
@@ -151,6 +179,8 @@ class ImageLoader(QtWidgets.QWidget):
             # self.label.setPixmap(self.pixmap)
             self.label.graphicsPixmapItem = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap(self.pixmap))
             self.label.scene.addItem(self.label.graphicsPixmapItem)
+
+            self.loadJSON(os.path.join(layersDir, JSON_FILENAME))
 
             dirpath = os.path.dirname(self.filename)
             self.fileList = []
@@ -192,7 +222,7 @@ class ImageLoader(QtWidgets.QWidget):
 
 
     def save_region_and_update_json(self, x_left, y_up, width, height, json_path):
-    # Check if JSON file exists
+        # Check if JSON file exists
         if os.path.exists(json_path):
             with open(json_path, 'r') as f:
                 data = json.load(f)
@@ -226,42 +256,69 @@ class ImageLoader(QtWidgets.QWidget):
 
     def saveROI(self):
         # dir = QtWidgets.QFileDialog.getExistingDirectory(self, 'Open Directory', '.', QtWidgets.QFileDialog.ShowDirsOnly)
-        
-        dir = self.dirname
-        pic = self.pixmap
-        painter = QtGui.QPainter(pic)
-        self.label.scene.render(painter)
+        dir = self.dirname    
 
-        painter.setPen(QtCore.Qt.darkRed)
-        pic.save(os.path.join(dir, os.path.join(self.baseName + '_Layers', self.baseName + '__Reference.jpg')), "JPG")
+        imagePath = os.path.join(dir, os.path.join(self.baseName + '_Layers',self.baseName + '_A.jpg'))
+        refImage = Image.open(imagePath)
+        # REFERENCE_SCALE = int(650/refImage.size[0]) 
+        if REFERENCE_SCALE > 1:
+            refImage = refImage.resize((refImage.size[0] * REFERENCE_SCALE, refImage.size[1] * REFERENCE_SCALE), Image.Resampling.LANCZOS)
+        draw = ImageDraw.Draw(refImage)
+
+        width, _ = refImage.size
+        ratio = width / self.pixmap.width()
+        for i, roi in enumerate(self.label.ROIList):
+            draw.rectangle([int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)], outline="red", width=10)
+            draw.rectangle([int(roi.x * ratio), int(roi.y * ratio), int((roi.x + 12) * ratio), int((roi.y + 12) * ratio)], fill="white", width=10)
+            # font_path = os.path.join(cv2.__path__[0], 'qt','fonts','DejaVuSans.ttf')
+            # font = ImageFont.truetype(font_path, size=5)
+            # draw.text((int(roi.x * ratio) + 15, int(roi.y * ratio) + 15), str(i + 1), font=font, fill="red")
+            draw.text((int(roi.x * ratio) + 15, int(roi.y * ratio) + 15), str(i + 1), fill="red")
+
+        # refImage.show()
+        refImage.save(os.path.join(dir, os.path.join(self.baseName + '_Layers', self.baseName + '__Reference.png')))
+
+        # pic = self.pixmap
+        # painter = QtGui.QPainter(pic)
+        # self.label.scene.render(painter)
+        # painter.setPen(QtCore.Qt.darkRed)
+        # pic.save(os.path.join(dir, os.path.join(self.baseName + '_Layers', self.baseName + '__Reference.png')))
+
+
+        if os.path.exists(os.path.join(dir, os.path.join(self.baseName + '_Layers', JSON_FILENAME))):
+            os.remove(os.path.join(dir, os.path.join(self.baseName + '_Layers', JSON_FILENAME)))
 
         for i, roi in enumerate(self.label.ROIList):
-            roiDir = os.path.join(dir, self.basename + '_RoI' + str(i + 1))
-            os.mkdir(roiDir)
-            # print(roiDir)
-            srcDir = os.path.dirname(self.filename)
-            # print(srcDir)
-            # psdImg = Image.open(self.psdName)
-            # psdWidth, _ = psdImg.size
-            # psdRatio = psdWidth / self.pixmap.width()
             
-            for f in os.listdir(srcDir):
-                if f.endswith(('.png', '.jpg', '.jpeg')):
-                    imgName= os.path.join(srcDir, f)
-                    im = Image.open(imgName)
-                    width, _ = im.size
-                    ratio = width / self.pixmap.width()
-                    # print(ratio)
-                    # print(roi.x, roi.y, roi.w, roi.h)
-                    # print((int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h * ratio)))
-                    im1 = im.crop((int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)))
-                    im1.save(os.path.join(roiDir, f), format = 'JPEG', dpi = im1.info['dpi'])
-                    # im2 = psdImg.crop((int(roi.x * psdRatio), int(roi.y * psdRatio), int((roi.w + roi.x) * psdRatio), int((roi.h + roi.y) * psdRatio)))
-                    # im2.save(os.path.join(roiDir, self.baseName + '_psd.psd'), format = 'PSD')
+            roiDir = os.path.join(dir, self.baseName + '_RoI' + str(i + 1))
+            if not os.path.exists(roiDir):
+                os.mkdir(roiDir)
+                # print(roiDir)
+                srcDir = os.path.dirname(self.filename)
+                # print(srcDir)
+                # psdImg = Image.open(self.psdName)
+                # psdWidth, _ = psdImg.size
+                # psdRatio = psdWidth / self.pixmap.width()
+                
+                for f in os.listdir(srcDir):
+                    if f.endswith(('.jpg')):
+                        imgName= os.path.join(srcDir, f)
+                        im = Image.open(imgName)
+                        width, _ = im.size
+                        ratio = width / self.pixmap.width()
+                        # print(ratio)
+                        # print(roi.x, roi.y, roi.w, roi.h)
+                        # print((int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h * ratio)))
+                        im1 = im.crop((int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)))
+                        im1.save(os.path.join(roiDir, f), format = 'JPEG', dpi = im1.info['dpi'])
+                        # im2 = psdImg.crop((int(roi.x * psdRatio), int(roi.y * psdRatio), int((roi.w + roi.x) * psdRatio), int((roi.h + roi.y) * psdRatio)))
+                        # im2.save(os.path.join(roiDir, self.baseName + '_psd.psd'), format = 'PSD')
 
             jsonPath = os.path.join(dir, os.path.join(self.baseName + '_Layers', JSON_FILENAME))
             # print(jsonPath)
             self.save_region_and_update_json(int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h  * ratio), jsonPath)
+
+        
 
         
 

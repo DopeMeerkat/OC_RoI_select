@@ -2,4 +2,4 @@
 cd "$(dirname "$0")"
 
 python selector.py
-exit
+# exit 0

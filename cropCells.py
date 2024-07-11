@@ -8,7 +8,10 @@ REFERENCE_SCALE = 5
 
 def drawLabelBox(imagePath, labelPath, saveDir):
     refImage = Image.open(imagePath)
-    if REFERENCE_SCALE != 1:
+    REFERENCE_SCALE = int(650/refImage.size[0]) 
+    # print(REFERENCE_SCALE)
+
+    if REFERENCE_SCALE > 1:
         refImage = refImage.resize((refImage.size[0] * REFERENCE_SCALE, refImage.size[1] * REFERENCE_SCALE), Image.Resampling.LANCZOS)
     draw = ImageDraw.Draw(refImage)
 
@@ -19,6 +22,7 @@ def drawLabelBox(imagePath, labelPath, saveDir):
             converted = pbx.convert_bbox((float(label[1]),float(label[2]),float(label[3]), float(label[4])), from_type="yolo", to_type="voc", image_size=refImage.size)
             # print(label)
             draw.rectangle([converted[0],converted[1],converted[2],converted[3]], outline="red", width=1)
+            draw.rectangle([converted[0],converted[1],converted[0]+16,converted[1]+16], fill="white", width=1)
             draw.text((converted[0] + 2,converted[1]), str(i + 1), fill="red")
 
     # refImage.save(os.path.join(saveDir, 'reference.jpg'), format = 'JPEG', dpi = refImage.info['dpi'])
