@@ -309,8 +309,10 @@ class ImageLoader(QtWidgets.QWidget):
                         # print(ratio)
                         # print(roi.x, roi.y, roi.w, roi.h)
                         # print((int(roi.x * ratio), int(roi.y * ratio), int(roi.w * ratio), int(roi.h * ratio)))
+                        ind = f.find('_')
+                        roiFilename = f[:ind] + '_ROI' + str(i + 1) + f[ind:]
                         im1 = im.crop((int(roi.x * ratio), int(roi.y * ratio), int((roi.w + roi.x) * ratio), int((roi.h + roi.y) * ratio)))
-                        im1.save(os.path.join(roiDir, f), format = 'JPEG', dpi = im1.info['dpi'])
+                        im1.save(os.path.join(roiDir, roiFilename), format = 'JPEG', dpi = im1.info['dpi'])
                         # im2 = psdImg.crop((int(roi.x * psdRatio), int(roi.y * psdRatio), int((roi.w + roi.x) * psdRatio), int((roi.h + roi.y) * psdRatio)))
                         # im2.save(os.path.join(roiDir, self.baseName + '_psd.psd'), format = 'PSD')
 
