@@ -11,7 +11,10 @@ Image.MAX_IMAGE_PIXELS = 200000000
 IMAGE_HEIGHT = 1024 
 IMAGE_WIDTH = 1024  
 JSON_FILENAME = 'RoI_coordinates.json'
+MIN_PIXELS = 128
+
 REFERENCE_SCALE = 1
+
 
 class ROI():
     def __init__(self, x, y, w, h):
@@ -30,18 +33,12 @@ class GraphicView(QtWidgets.QGraphicsView):
         self.setMouseTracking(True)
         self.origin = QtCore.QPoint()
         self.changeRubberBand = False
-
         self.scene = QtWidgets.QGraphicsScene()
-        
         self.setScene(self.scene)
-        # self.setSceneRect(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT)
-
         self.selectedRegion = {'x':0,'y':0,'w':-1,'h':-1}
         self.ROIList = []
-        # self.pen = QtGui.QPen(QtCore.Qt.darkRed, 4)
-
-        # self.backgroundImage = None
         self.graphicsPixmapItem = None
+        self.minPixels = 0
 
 
     def mousePressEvent(self, event):
@@ -63,8 +60,12 @@ class GraphicView(QtWidgets.QGraphicsView):
         QtWidgets.QGraphicsView.mouseReleaseEvent(self, event)
         self.selectedRegion['x'] = self.rubberBand.geometry().x()
         self.selectedRegion['y'] = self.rubberBand.geometry().y()
-        self.selectedRegion['w'] = self.rubberBand.geometry().width()
-        self.selectedRegion['h'] = self.rubberBand.geometry().height()
+
+
+        self.selectedRegion['w'] = (int(self.rubberBand.geometry().width() / self.minPixels) + 1) * self.minPixels
+        self.selectedRegion['h'] = (int(self.rubberBand.geometry().height() / self.minPixels) + 1) * self.minPixels
+
+
         self.scene.addRect(self.selectedRegion['x'],self.selectedRegion['y'],self.selectedRegion['w'],self.selectedRegion['h'], pen = QtGui.QPen(QtCore.Qt.red, 4))
         self.ROIList.append(ROI(self.selectedRegion['x'],self.selectedRegion['y'],self.selectedRegion['w'],self.selectedRegion['h']))
         self.rubberBand.hide()
@@ -177,6 +178,12 @@ class ImageLoader(QtWidgets.QWidget):
             if self.pixmap.isNull():
                 return
             # self.label.setPixmap(self.pixmap)
+            im = Image.open(self.filename)
+            width, _ = im.size
+            ratio = self.pixmap.width() / width
+            # print(ratio)
+            self.label.minPixels = MIN_PIXELS * ratio
+
             self.label.graphicsPixmapItem = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap(self.pixmap))
             self.label.scene.addItem(self.label.graphicsPixmapItem)
 
@@ -290,7 +297,7 @@ class ImageLoader(QtWidgets.QWidget):
 
         for i, roi in enumerate(self.label.ROIList):
             
-            roiDir = os.path.join(dir, self.baseName + '_RoI' + str(i + 1))
+            roiDir = os.path.join(dir, self.baseName + '_ROI' + str(i + 1))
             if not os.path.exists(roiDir):
                 os.mkdir(roiDir)
                 # print(roiDir)
