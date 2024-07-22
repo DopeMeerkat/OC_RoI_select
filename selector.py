@@ -34,6 +34,7 @@ class GraphicView(QtWidgets.QGraphicsView):
         self.origin = QtCore.QPoint()
         self.changeRubberBand = False
         self.scene = QtWidgets.QGraphicsScene()
+        self.scene.setSceneRect(QtCore.QRectF(0,0,IMAGE_WIDTH, IMAGE_HEIGHT))
         self.setScene(self.scene)
         self.selectedRegion = {'x':0,'y':0,'w':-1,'h':-1}
         self.ROIList = []
